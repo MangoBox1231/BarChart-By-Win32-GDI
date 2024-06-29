@@ -1,0 +1,5 @@
+﻿  BarChart.cpp
+C:\Users\26876\Desktop\WindowsApp\Learn\GDI\Learning_3\BarChart\BarChart.cpp(242,44): warning C4267: “=”: 从“size_t”转换到“int”，可能丢失数据
+C:\Users\26876\Desktop\WindowsApp\Learn\GDI\Learning_3\BarChart\BarChart.cpp(343,20): warning C4267: “初始化”: 从“size_t”转换到“int”，可能丢失数据
+C:\Users\26876\Desktop\WindowsApp\Learn\GDI\Learning_3\BarChart\BarChart.cpp(349,23): warning C4244: “初始化”: 从“double”转换到“int”，可能丢失数据
+  BarChart.vcxproj -> C:\Users\26876\Desktop\WindowsApp\Learn\GDI\Learning_3\BarChart\x64\Debug\BarChart.exe
