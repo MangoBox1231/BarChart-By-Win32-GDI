@@ -1,2 +1,6 @@
-# BarChart-By-Win32-GDI
+## BarChart-By-Win32-GDI
 使用Win32 GDI 绘制一个条形图
+
+可以自定义包括**宽度**、**间隔**、**字体**、**注释**等参数
+
+它十分简洁
