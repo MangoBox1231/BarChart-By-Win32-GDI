@@ -1,4 +1,4 @@
-﻿// BarChart.cpp : 定义应用程序的入口点。
+// BarChart.cpp : 定义应用程序的入口点。
 //
 
 #include "framework.h"
@@ -25,19 +25,41 @@ public:
     /// <param name="str">：一个字符串，长度有限</param>
     void SetText(string str) { this->Text = str; }
 
+    bool SetBarText(int pos, string Str) {
+        if (pos >= 0 && pos < EachBarText.size()) {
+            EachBarText.emplace(EachBarText.begin() + pos, Str);
+            return true;
+        }
+        return false;
+    }
+
+    bool SetBarColor(int pos, COLORREF Color) {
+        if (pos >= 0 && pos < EachBarColor.size()) {
+            EachBarColor.emplace(EachBarColor.begin() + pos, Color);
+            return true;
+        }
+        return false;
+    }
+
     /// <summary>
     /// 插入一个Bar到指定位置（默认为尾部）
     /// </summary>
     /// <param name="value">：Bar的数值，或理解为Y轴的坐标</param>
+    /// <param name="str">：Bar的显示文本</param>
+    /// <param name="Color">：Bar的颜色</param>
     /// <param name="pos">：当填写时，保证[0 &lt; pos &lt; size]</param>
     /// <returns>bool类型的值: [true]成功, [false]失败</returns>
-    bool InsertBar(int value, int pos = -1) {
+    bool InsertBar(int value, string str, COLORREF Color, int pos = -1) {
         if (pos == -1) {
             EachBarData.emplace_back(value);
+            EachBarText.emplace_back(str);
+            EachBarColor.emplace_back(Color);
             return true;
         }
         if (pos >= 0 && pos < EachBarData.size()) {
             EachBarData.emplace(EachBarData.begin() + pos, value);
+            EachBarText.emplace(EachBarText.begin() + pos, str);
+            EachBarColor.emplace(EachBarColor.begin() + pos, Color);
             return true;
         }
         return false;
@@ -48,6 +70,7 @@ public:
     /// </summary>
     void clear() {
         EachBarData.clear();
+        EachBarText.clear();
         int X = -1;
         string Text = "";
     }
@@ -70,8 +93,26 @@ public:
     /// <returns>一个vector<int>，包含所有Bar的数据</returns>
     vector<int> GetBarData() const { return this->EachBarData; }
 
+    /// <summary>
+    /// 获取所有Bar的颜色数据
+    /// </summary>
+    /// <returns></returns>
+    vector<COLORREF> GetBarColors() const { return this->EachBarColor; }
+
+    /// <summary>
+    /// 获取指定Bar的颜色数据
+    /// </summary>
+    /// <param name="i"></param>
+    /// <returns></returns>
+    COLORREF GetBarColor(int i) const { 
+        if (i >= 0 && i < EachBarColor.size()) return EachBarColor[i];
+        else return RGB(0, 0, 0);
+    }
+
 private:
     vector<int> EachBarData;
+    vector<string> EachBarText;
+    vector<COLORREF> EachBarColor;
     int X = -1;
     string Text = "";
 };
@@ -100,11 +141,13 @@ public:
     /// <param name="YName">：Y轴的名称</param>
     /// <param name="BarWid">：每个Bar的宽度</param>
     /// <param name="Color">：不同Bar的颜色，按顺序读取</param>
+    /// <param name="_EnableSample">：是否绘制图例，[true]开，[false]关</param>
+    /// <param name="SampleRect">：图例的位置（相对于起始点），只使用left和top参数（如果为默认值则自动生成）请保持right与bottom为0</param>
     /// <param name="hFont">：所有文字的字体</param>
-    void InitializeChart(vector<UnitData> Data, int XUnit, int YUnit, string XName, string YName, int BarWid, vector<COLORREF> Color, HFONT hFont = NULL) {
+    void InitializeChart(vector<UnitData> Data, int XUnit, int YUnit, string XName, string YName, 
+                            int BarWid, HFONT hFont = NULL, bool _EnableSample = true, RECT _SampleRect = { -1,-1,-1,-1 }) {
         this->X_Unit = XUnit;
         this->Y_Unit = YUnit;
-        this->Colors = Color;
         this->X_Name = XName;
         this->Y_Name = YName;
         this->BarWidth = BarWid;
@@ -115,8 +158,15 @@ public:
         if (!Data.empty())
             Units.insert(Units.end(), Data.begin(), Data.end());
 
+        this->YNEnableSample = _EnableSample;
+
+        this->SampleRect = _SampleRect;
 
         return;
+    }
+
+    void EnableSample(bool f) {
+        this->YNEnableSample = f;
     }
 
     /// <summary>
@@ -132,28 +182,10 @@ public:
     void SetYUnit(int Unit) { this->Y_Unit = Unit; }
 
     /// <summary>
-    /// 设置不同Bar的颜色
+    /// 设置图例的显示区域
     /// </summary>
-    /// <param name="color">：vector<COLORREF></param>
-    void SetColors(vector<COLORREF> color) { this->Colors = color; }
-
-    /// <summary>
-    /// 插入一个颜色到列表中，默认添加在尾部
-    /// </summary>
-    /// <param name="color">：一个COLORREF</param>
-    /// <param name="pos">：当填写时，保证[0 &lt; pos &lt; size]</param>
-    /// <returns></returns>
-    bool SetColor(COLORREF color, int pos = -1) {
-        if (pos == -1) {
-            Colors.emplace_back(color);
-            return true;
-        }
-        if (pos >= 0 && pos < Colors.size()) {
-            Colors.emplace(Colors.begin() + pos, color);
-            return true;
-        }
-        return false;
-    }
+    /// <param name="rect">：仅使用left和top</param>
+    void SetSampleRect(RECT rect) { this->SampleRect = rect; }
 
     /// <summary>
     /// 获取X轴坐标长度，坐标长度自动生成，由Bar和Unit的数量的坐标决定
@@ -193,16 +225,6 @@ public:
     UnitData GetUnitData(int i) const { return this->Units[i]; }
 
     /// <summary>
-    /// 获取指定Color数据
-    /// </summary>
-    /// <param name="i">：当填写时，保证[0 &lt; i &lt; size]</param>
-    /// <returns></returns>
-    COLORREF GetBarColor(int i) const { 
-        if (i >= 0 && i < Colors.size()) return this->Colors[i];
-        else return RGB(255,255,255);
-    }
-
-    /// <summary>
     /// 获取X轴的名称
     /// </summary>
     /// <returns></returns>
@@ -226,6 +248,24 @@ public:
     /// <returns></returns>
     HFONT GetAxisFont() const { return this->hFont_Axis; }
 
+    /// <summary>
+    /// 获取图例的显示区域
+    /// </summary>
+    /// <returns>忽略right和bottom参数，left和top分别代表距离起始点的长和高</returns>
+    RECT GetSampleRect() const { return this->SampleRect; }
+
+    /// <summary>
+    /// 检查图例绘制是否启用
+    /// </summary>
+    /// <returns></returns>
+    bool IsSampleEnable() const { return this->YNEnableSample; }
+
+    /// <summary>
+    /// 获取所有的图例
+    /// </summary>
+    /// <returns></returns>
+    vector<pair<COLORREF, string>> GetSamples() const { return this->Samples; }
+
 private:
     /// <summary>
     /// 用于更新坐标轴的长度
@@ -247,11 +287,25 @@ private:
                 LastUnitYPos = max(Bar, LastUnitYPos);
             }
         }
-        this->Y_Axis_Length = LastUnitYPos + 30 * this->Y_Unit;
+        this->Y_Axis_Length = LastUnitYPos + 30 / this->Y_Unit;
+
+        if (SampleRect.bottom == -1) {
+            this->SampleRect.left = this->X_Axis_Length - 50 / this->X_Unit;
+            this->SampleRect.top = this->Y_Axis_Length + 10 / this->Y_Unit;
+        }
+
+        for (auto Unit : Units) {
+            for (int i = 0; i < Unit.EachBarData.size(); i++) {
+                auto it = find_if(Samples.begin(), Samples.end(), 
+                    [Unit,i](pair<COLORREF,string> S) {return Unit.EachBarText[i] == S.second; });//查找是否有重复项已存在
+                if (it == Samples.end()) {//若没有
+                    Samples.emplace_back(pair<COLORREF, string>(Unit.EachBarColor[i], Unit.EachBarText[i]));//录入
+                }
+            }
+        }
     }
 
     vector<UnitData> Units;
-    vector<COLORREF> Colors;//根据顺序进行应用
     int X_Axis_Length = 0;//坐标轴长度
     int X_Unit = 0;//单位
     int Y_Axis_Length = 0;
@@ -260,6 +314,9 @@ private:
     string Y_Name = "";//坐标轴文本
     string X_Name = "";
     HFONT hFont_Axis = NULL;//所有文本的字体
+    bool YNEnableSample = false;//是否绘制图例
+    RECT SampleRect = { 0,0,0,0 };//图例的显示区域，仅使用left和top，left和top分别代表距离起始点的长和高
+    vector<pair<COLORREF, string>> Samples;//所有图例的颜色和文本
 };
 
 // 全局变量:
@@ -298,8 +355,8 @@ string LPWSTR2str(LPWSTR lpwstr) {
 
 //@brief 所有单位均使用对话框单位
 //@param hdc, StartPos, Data, Axis
-void DrawBarChart(HDC hdc, POINT StartPos, ChartData Data, COLORREF Axis = RGB(255, 255, 255)) {
-    const int BarWidth = MulDiv(Data.GetBarWidth(), LOWORD(GetDialogBaseUnits()), 4);//获取Bar的宽度
+void DrawBarChart(HDC hdc, POINT StartPos, ChartData Data, COLORREF Axis = RGB(0, 0, 0)) {
+    const int BarWidth = Data.GetBarWidth();//获取Bar的宽度
 
     //将对话框模板转换为像素
     StartPos.x = MulDiv(StartPos.x, LOWORD(GetDialogBaseUnits()), 4);
@@ -308,8 +365,8 @@ void DrawBarChart(HDC hdc, POINT StartPos, ChartData Data, COLORREF Axis = RGB(2
     //移动至起始位置
     MoveToEx(hdc, StartPos.x, StartPos.y, NULL);
 
-    HBRUSH AxisBrush = CreateSolidBrush(Axis);//创建并选择指定颜色的画笔
-    SelectObject(hdc, AxisBrush);
+    HPEN AxisPen = CreatePen(PS_SOLID, 1, Axis);//创建并选择指定颜色的画笔
+    SelectObject(hdc, AxisPen);
 
     //绘制坐标轴
     LineTo(hdc, StartPos.x + MulDiv(Data.GetXAxisLength(), LOWORD(GetDialogBaseUnits()), 4), StartPos.y);//X
@@ -353,23 +410,25 @@ void DrawBarChart(HDC hdc, POINT StartPos, ChartData Data, COLORREF Axis = RGB(2
             int Y_Pos_Pixel = StartPos.y - MulDiv(Y_Pos, HIWORD(GetDialogBaseUnits()), 8);//转换为像素
 
             //进行
-            HBRUSH BarBrush = CreateSolidBrush(Data.GetBarColor(ptr));//获取当前Bar的颜色，如果存在
-            SelectObject(hdc, BarBrush);
+            HPEN BarPen = CreatePen(PS_INSIDEFRAME, 1, Unit.GetBarColor(ptr));//获取当前Bar的颜色，如果存在
+            HPEN OldPen = (HPEN)SelectObject(hdc, BarPen);
+            DeleteObject(OldPen);
 
-            MoveToEx(hdc, X_Pos_Pixel, StartPos.y, NULL);
-            LineTo(hdc, X_Pos_Pixel, Y_Pos_Pixel);//左侧的竖线
+            HBRUSH BarBrush = CreateHatchBrush(HS_BDIAGONAL, Unit.GetBarColor(ptr));
+            HBRUSH OldBrush = (HBRUSH)SelectObject(hdc, BarBrush);
+            DeleteObject(OldBrush);
 
-            X_Pos += BarWidth;
-            X_Pos_Pixel = StartPos.x + MulDiv(X_Pos, LOWORD(GetDialogBaseUnits()), 4);
-            LineTo(hdc, X_Pos_Pixel, Y_Pos_Pixel);//顶部的横线
-            LineTo(hdc, X_Pos_Pixel, StartPos.y);//右侧的竖线
+            RECT _Rectangle;
+            _Rectangle.left = X_Pos_Pixel;
+            _Rectangle.right = X_Pos_Pixel + MulDiv(BarWidth, LOWORD(GetDialogBaseUnits()), 4);
+            _Rectangle.top = Y_Pos_Pixel;
+            _Rectangle.bottom = StartPos.y;
+
+            Rectangle(hdc, _Rectangle.left, _Rectangle.top, _Rectangle.right, _Rectangle.bottom);
 
             RECT TextBox;
-            TextBox.left = X_Pos - BarWidth + 1, TextBox.right = X_Pos, TextBox.top = Y_Pos + 10, TextBox.bottom = Y_Pos;
-            TextBox.left = StartPos.x + MulDiv(TextBox.left, LOWORD(GetDialogBaseUnits()), 4);
-            TextBox.right = StartPos.x + MulDiv(TextBox.right, LOWORD(GetDialogBaseUnits()), 4);
-            TextBox.top = StartPos.y - MulDiv(TextBox.top, HIWORD(GetDialogBaseUnits()), 8);
-            TextBox.bottom = StartPos.y - MulDiv(TextBox.bottom, HIWORD(GetDialogBaseUnits()), 8);
+            TextBox.left = _Rectangle.left + 1, TextBox.right = _Rectangle.right;
+            TextBox.top = _Rectangle.top - 20, TextBox.bottom = _Rectangle.top;
             DrawText(hdc, str2LPWSTR(to_string(Bars[ptr])), -1, &TextBox, DT_CENTER | DT_VCENTER | DT_SINGLELINE);//Bar文本
 
             ptr++;//Bar数据下标
@@ -384,7 +443,48 @@ void DrawBarChart(HDC hdc, POINT StartPos, ChartData Data, COLORREF Axis = RGB(2
         TextBox.right = StartPos.x + MulDiv(TextBox.right, LOWORD(GetDialogBaseUnits()), 4);
         DrawText(hdc, str2LPWSTR(Unit.GetText()), -1, &TextBox, DT_CENTER | DT_VCENTER | DT_SINGLELINE);//Unit文本
     }
+
+    //绘制图例
+    if (!Data.IsSampleEnable()) return;//判断是否需要绘制图例
+    RECT Rect = Data.GetSampleRect();
+    Rect.left = MulDiv(Rect.left, LOWORD(GetDialogBaseUnits()), 4);
+    Rect.top = MulDiv(Rect.top, HIWORD(GetDialogBaseUnits()), 8);
+    Rect.left += StartPos.x;
+    Rect.top = StartPos.y - Rect.top;
+
+    const int SampleLength = (double)BarWidth / 2;
+
+    int Cnt = 0;//已处理的个数
+    for (auto Sample : Data.GetSamples()) {
+        HPEN BarPen = CreatePen(PS_INSIDEFRAME, 1, Sample.first);//获取当前Sample的颜色，如果存在
+        HPEN OldPen = (HPEN)SelectObject(hdc, BarPen);
+        DeleteObject(OldPen);
+
+        HBRUSH BarBrush = CreateHatchBrush(HS_BDIAGONAL, Sample.first);
+        HBRUSH OldBrush = (HBRUSH)SelectObject(hdc, BarBrush);
+        DeleteObject(OldBrush);
+
+        RECT SingleRect;
+        SingleRect.left = Rect.left;
+        SingleRect.top = Rect.top + Cnt * MulDiv(SampleLength * 2, HIWORD(GetDialogBaseUnits()), 8);
+        SingleRect.right = Rect.left + MulDiv(SampleLength, LOWORD(GetDialogBaseUnits()), 4);
+        SingleRect.bottom = SingleRect.top + MulDiv(SampleLength, HIWORD(GetDialogBaseUnits()), 8);
+
+        Rectangle(hdc, SingleRect.left, SingleRect.top, SingleRect.right, SingleRect.bottom);
+
+        RECT TextBox;
+        TextBox.left = SingleRect.right + 20, TextBox.right = SingleRect.right + 128;
+        TextBox.top = SingleRect.top, TextBox.bottom = SingleRect.top + 20;
+        DrawText(hdc, str2LPWSTR(Sample.second), -1, &TextBox, DT_LEFT | DT_VCENTER | DT_SINGLELINE);//Sample文本
+
+        Cnt++;
+    }
 }
+
+/*MessageBoxA(NULL,
+            (to_string(SingleRect.left) + "\n" + to_string(SingleRect.right) + "\n" +
+                to_string(SingleRect.top) + "\n" + to_string(SingleRect.bottom)).c_str(), "test", MB_OK
+        );*/
 
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
                      _In_opt_ HINSTANCE hPrevInstance,
@@ -521,22 +621,24 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             UnitData Unit;//创建Unit
             
             //插入Bar
-            Unit.InsertBar(200);
-            Unit.InsertBar(100);
-            Unit.InsertBar(50);
+            Unit.InsertBar(200, "Name1", RGB(255, 0, 0));
+            Unit.InsertBar(100, "Name2", RGB(0, 255, 0));
+            Unit.InsertBar(50, "Name3", RGB(0, 0, 255));
            
             //设置X坐标
             Unit.SetXPos(100);
             
             //设置Unit文本
-            Unit.SetText("test");
+            Unit.SetText("Item1");
             
             //创建字体
             HFONT hFont = CreateFont(0, 0, 0, 0, 0, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH | FF_SWISS, L"微软雅黑");
-            
+
             //初始化表格
-            Chart.InitializeChart(vector<UnitData>(), 1, 1, "项目", "分数", 10, vector<COLORREF>(RGB(255, 0, 0), RGB(0, 255, 0)), hFont);
-            
+            //Chart.InitializeChart(vector<UnitData>(), 1, 1, "项目", "分数", 20, hFont, false);
+            //Chart.InitializeChart(vector<UnitData>(), 1, 1, "项目", "分数", 20, hFont, true, RECT{ 200,200,0,0 });
+            Chart.InitializeChart(vector<UnitData>(), 1, 1, "项目", "分数", 20, hFont);
+
             //插入Unit
             Chart.InsertUnit(Unit);
 
@@ -544,11 +646,11 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             Unit.clear();
 
             //同上
-            Unit.InsertBar(100);
-            Unit.InsertBar(50);
-            Unit.InsertBar(60);
+            Unit.InsertBar(100, "Name1", RGB(255, 0, 0));
+            Unit.InsertBar(50, "Name2", RGB(0, 255, 0));
+            Unit.InsertBar(60, "Name3", RGB(0, 0, 255));
             Unit.SetXPos(200);
-            Unit.SetText("test1");
+            Unit.SetText("Item2");
 
             //同上
             Chart.InsertUnit(Unit);
